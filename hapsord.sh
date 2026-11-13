@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 # =========================================
-# 🚀 HAPROXY-XRAY DEPLOYER — CLEAN VERSION
+# 🚀 HAPROXY-XRAY DEPLOYER — FIXED VERSION
 # ✅ UUID/PASSWORD/PATH direct sa JSON
+# ✅ Fixed Shadowsocks Inbound & HAProxy WS/H2
 # ✅ Menu + regions intact
 # ✅ All deploy flags included
 # =========================================
@@ -117,11 +118,11 @@ while true; do
     trap 'rm -rf "$BUILD_DIR"' EXIT
     cd "$BUILD_DIR" || exit 1
 
-    # === xray.json — direct values ===
+    # === xray.json — fixed shadowsocks inbound & direct values ===
     cat > xray.json <<'EOF'
 {
   "log": {
-    "loglevel": "info",
+    "loglevel": "warning",
     "access": "/dev/stdout",
     "error": "/dev/stderr"
   },
@@ -154,7 +155,11 @@ while true; do
       "port": 10003,
       "listen": "127.0.0.1",
       "protocol": "shadowsocks",
-      "settings": {"servers": [{"address": "127.0.0.1", "port": 10003, "method": "aes-256-gcm", "password": "gcp-xray"}]},
+      "settings": {
+        "method": "aes-256-gcm",
+        "password": "gcp-xray",
+        "network": "tcp,udp"
+      },
       "streamSettings": {"network": "ws", "wsSettings": {"path": "/xray-ss"}}
     }
   ],
@@ -162,18 +167,23 @@ while true; do
 }
 EOF
 
-    # === haproxy.cfg ===
+    # === haproxy.cfg — fixed H2 & WebSocket tunnel timeouts ===
     cat > haproxy.cfg <<'EOF'
 global
     log stdout format raw local0 info
     maxconn 10000
+
 defaults
     mode http
+    option http-server-close
+    option forwardfor
     timeout connect 10s
     timeout client 3600s
     timeout server 3600s
+    timeout tunnel 3600s
+
 frontend http-in
-    bind *:8080
+    bind *:8080 proto h2,http/1.1
     http-response set-header Server Cloudflare
     
     acl root_path path /
@@ -220,7 +230,7 @@ command=python3 -m http.server 9090 --bind 127.0.0.1
 directory=/var/www/decoy
 autostart=true
 autorestart=true
-startsecs=10
+startsecs=5
 startretries=999
 stdout_logfile=/dev/stdout
 stderr_logfile=/dev/stderr
@@ -229,7 +239,7 @@ stderr_logfile=/dev/stderr
 command=/opt/xray/xray run -config /etc/xray/config.json
 autostart=true
 autorestart=true
-startsecs=15
+startsecs=5
 startretries=999
 stdout_logfile=/dev/stdout
 stderr_logfile=/dev/stderr
@@ -291,23 +301,31 @@ EOF
         --port=8080 \
         --allow-unauthenticated \
         --no-cpu-throttling \
-        --cpu="2" \
-        --memory="2Gi" \
-        --min-instances="1" \
-        --max-instances="6" \
-        --concurrency="120" \
-        --timeout="3600" \
+        --cpu="$CPU" \
+        --memory="$MEMORY" \
+        --min-instances="$MIN_INST" \
+        --max-instances="$MAX_INST" \
+        --concurrency="$CONCURRENCY" \
+        --timeout="$TIMEOUT" \
         --session-affinity \
         --execution-environment=gen2 \
         --cpu-boost \
         --quiet
 
     SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
+    DOMAIN=${SERVICE_URL#https://}
     clear
     echo -e "${GREEN}==================================================${NC}"
     echo -e "${GREEN}✅ DEPLOYED SUCCESSFULLY!${NC}"
     echo -e "🔊 Service URL: $SERVICE_URL"
     echo -e "💚 Health Check: $SERVICE_URL/health"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW}📋 CLIENT CREDENTIALS (NETMOD):${NC}"
+    echo -e "Host / SNI : $DOMAIN"
+    echo -e "Port       : 443 (TLS ON, ALPN: http/1.1)"
+    echo -e "UUID       : a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
+    echo -e "Password   : gcp-xray"
+    echo -e "Paths      : /xray-vless | /xray-vmess | /xray-trojan | /xray-ss"
     echo -e "${GREEN}==================================================${NC}"
     echo ""
     read -p "Press Enter to return..."
