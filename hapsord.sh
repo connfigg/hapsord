@@ -13,21 +13,17 @@ UUID_VMESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
 TROJAN_PASS="gcp-xray"
 SS_PASS="gcp-xray"
 
-# 🗺️ FALLBACK REGIONS
+# 🗺️ FALLBACK REGIONS — KANUNAY GIGAMIT RA
 FALLBACK_REGIONS=(
   "asia-southeast1"    # Singapore — BEST for PH
   "asia-southeast2"    # Jakarta
   "asia-east1"         # Taiwan
   "asia-east2"         # Hong Kong
   "asia-northeast1"    # Tokyo
-  "asia-northeast2"    # Osaka
-  "asia-northeast3"    # Seoul
-  "us-central1"        # Iowa
+  "us-central1"        # Iowa — FREE TIER ✅
   "us-east1"           # South Carolina
   "us-west1"           # Oregon
   "europe-west1"       # Belgium
-  "europe-west2"       # London
-  "europe-central2"    # Warsaw
 )
 # ==============================================
 
@@ -50,44 +46,72 @@ fi
 echo "✅ Project: $PROJECT_ID"
 echo ""
 
-# 🌍 REGION SELECTOR
+# 🌍 REGION SELECTOR — CLEAN VERSION ✅
 echo "🌍 Fetching available regions..."
-AVAILABLE_REGIONS=$(gcloud run regions list --format="value(name)" 2>/dev/null | tr '\n' ' ')
+AVAILABLE_REGIONS=$(gcloud run regions list --format="value(name)" 2>/dev/null)
 
+REGION_LIST=()
 if [ -n "$AVAILABLE_REGIONS" ]; then
-  echo "✅ Online list loaded"
-  REGION_LIST=($(echo "$AVAILABLE_REGIONS"))
+  # ✅ EXTRACT PURE REGION CODE LANG — kuha ang katapusan human sa '/'
+  while IFS= read -r line; do
+    REGION_CLEAN="${line##*/}"
+    REGION_LIST+=("$REGION_CLEAN")
+  done <<< "$AVAILABLE_REGIONS"
+  
+  if [ ${#REGION_LIST[@]} -eq 0 ]; then
+    echo "⚠️  Using built-in region list"
+    REGION_LIST=("${FALLBACK_REGIONS[@]}")
+  fi
 else
   echo "⚠️  Using built-in region list"
   REGION_LIST=("${FALLBACK_REGIONS[@]}")
 fi
 
-echo ""
-echo "🗺️  Select Region:"
-for i in "${!REGION_LIST[@]}"; do
-  printf "   [%2d] %s\n" "$((i+1))" "${REGION_LIST[$i]}"
-done
-echo "   [ M ] Manual input — type your own region code"
-echo ""
-read -p "👉 Enter number OR M for manual: " CHOICE
+# 🗺️ SELECTION LOOP — WITH BACK + EXIT ✅
+while true; do
+  echo ""
+  echo "🗺️  Select Region:"
+  for i in "${!REGION_LIST[@]}"; do
+    printf "   [%2d] %s\n" "$((i+1))" "${REGION_LIST[$i]}"
+  done
+  echo "   [ M ] Manual input — type your own region code"
+  echo "   [ E ] Exit — Close Cloud Shell"
+  echo ""
+  read -p "👉 Enter your choice: " CHOICE
 
-if [[ "$CHOICE" =~ ^[Mm]$ ]]; then
-  read -p "✏️  Enter region code (e.g. us-south1): " REGION
-  if [ -z "$REGION" ]; then
-    echo "⚠️  Empty — using asia-southeast1"
-    REGION="asia-southeast1"
-  fi
-elif [[ "$CHOICE" =~ ^[0-9]+$ ]] && [ "$CHOICE" -ge 1 ] && [ "$CHOICE" -le ${#REGION_LIST[@]} ]; then
-  REGION="${REGION_LIST[$((CHOICE-1))]}"
-else
-  echo "⚠️  Invalid — using asia-southeast1"
-  REGION="asia-southeast1"
-fi
-echo "✅ Region: $REGION"
+  case "$CHOICE" in
+    [Ee])
+      echo "👋 Exiting... Cloud Shell will close in 2 seconds..."
+      sleep 2
+      exit 0
+      ;;
+    [Mm])
+      read -p "✏️  Enter region code (e.g. us-central1): " REGION
+      if [ -n "$REGION" ]; then
+        echo "✅ Selected: $REGION"
+        break
+      else
+        echo "⚠️  Empty input — please try again"
+      fi
+      ;;
+    [0-9]*)
+      if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_LIST[@]} ]; then
+        REGION="${REGION_LIST[$((CHOICE-1))]}"
+        echo "✅ Selected: $REGION"
+        break
+      else
+        echo "⚠️  Invalid number — please try again"
+      fi
+      ;;
+    *)
+      echo "⚠️  Invalid option — please try again"
+      ;;
+  esac
+done
 echo ""
 
 # 📦 Artifact Registry Setup
-echo "📦 Setting up Artifact Registry..."
+echo "📦 Setting up Artifact Registry in $REGION..."
 if ! gcloud artifacts repositories describe "$AR_REPO" --location="$REGION" &>/dev/null; then
   gcloud artifacts repositories create "$AR_REPO" \
     --repository-format=docker \
