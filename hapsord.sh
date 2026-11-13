@@ -13,35 +13,20 @@ UUID_VMESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
 TROJAN_PASS="gcp-xray"
 SS_PASS="gcp-xray"
 
-# 🗺️ CURATED REGIONS WITH FLAGS ✅
-REGION_CODES=(
-  "us-central1"
-  "us-east1"
-  "us-east4"
-  "us-west1"
-  "asia-east1"
-  "asia-southeast1"
-  "asia-northeast1"
-  "asia-northeast3"
-  "asia-south1"
-  "europe-west1"
-  "europe-west4"
-  "europe-west9"
-)
-
-REGION_LABELS=(
-  "us-central1      — Iowa, US 🇺🇸"
-  "us-east1         — South Carolina, US 🇺🇸"
-  "us-east4         — N. Virginia, US 🇺🇸"
-  "us-west1         — Oregon, US 🇺🇸"
-  "asia-east1       — Taiwan 🇹🇼"
-  "asia-southeast1  — Singapore 🇸🇬 (BEST for PH)"
-  "asia-northeast1  — Tokyo, Japan 🇯🇵"
-  "asia-northeast3  — Seoul, South Korea 🇰🇷"
-  "asia-south1      — Mumbai, India 🇮🇳"
-  "europe-west1     — Belgium 🇧🇪"
-  "europe-west4     — Netherlands 🇳🇱"
-  "europe-west9     — Paris, France 🇫🇷"
+# 🗺️ FALLBACK REGIONS — EXACTLY AS REQUESTED ✅
+FALLBACK_REGIONS=(
+  "us-central1|Iowa, US 🇺🇸"
+  "us-east1|South Carolina, US 🇺🇸"
+  "us-east4|N. Virginia, US 🇺🇸"
+  "us-west1|Oregon, US 🇺🇸"
+  "asia-east1|Taiwan 🇹🇼"
+  "asia-southeast1|Singapore 🇸🇬 — BEST for PH"
+  "asia-northeast1|Tokyo, Japan 🇯🇵"
+  "asia-northeast3|Seoul, South Korea 🇰🇷"
+  "asia-south1|Mumbai, India 🇮🇳"
+  "europe-west1|Belgium 🇧🇪"
+  "europe-west4|Netherlands 🇳🇱"
+  "europe-west9|Paris, France 🇫🇷"
 )
 # ==============================================
 
@@ -62,13 +47,21 @@ if [ -z "$PROJECT_ID" ]; then
   exit 1
 fi
 echo "✅ Project: $PROJECT_ID"
+echo ""
 
-# 🗺️ SELECTION LOOP — CURATED WITH FLAGS ✅
+# 🌍 REGION SELECTOR — CURATED WITH FLAGS ✅
+echo "🌍 Loading regions..."
+REGION_LIST=("${FALLBACK_REGIONS[@]}")
+echo "✅ Curated regions loaded: ${#REGION_LIST[@]} regions"
+
+# 🗺️ SELECTION LOOP — WITH EXIT ✅
 while true; do
   echo ""
   echo "🗺️  Select Region:"
-  for i in "${!REGION_LABELS[@]}"; do
-    printf "   [%2d] %s\n" "$((i+1))" "${REGION_LABELS[$i]}"
+  for i in "${!REGION_LIST[@]}"; do
+    CODE="${REGION_LIST[$i]%%|*}"
+    DESC="${REGION_LIST[$i]#*|}"
+    printf "   [%2d] %-16s — %s\n" "$((i+1))" "$CODE" "$DESC"
   done
   echo "   [ M ] Manual input — type your own region code"
   echo "   [ E ] Exit — Close Cloud Shell"
@@ -91,8 +84,9 @@ while true; do
       fi
       ;;
     [0-9]*)
-      if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_CODES[@]} ]; then
-        REGION="${REGION_CODES[$((CHOICE-1))]}"
+      if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_LIST[@]} ]; then
+        SELECTED_ITEM="${REGION_LIST[$((CHOICE-1))]}"
+        REGION="${SELECTED_ITEM%%|*}"
         echo "✅ Selected: $REGION"
         break
       else
@@ -321,18 +315,18 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — FIXED 'supervisor' package name ✅ ===
+# === Dockerfile — FIXED curl + ca-certificates + supervisor ✅ ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
 ENV XRAY_VERSION="v24.11.10"
 
-RUN apk update && apk add --no-cache haproxy wget unzip python3 supervisor && \
+RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
     rm -rf /var/cache/apk/*
 
 # Install Xray
 RUN mkdir -p /opt/xray && \
-    wget -qO /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" && \
+    curl -fSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray.zip && \
     unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
 
 # Copy configs
