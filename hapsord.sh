@@ -1,4 +1,3 @@
-cat << 'EOF' > hapsord1.sh
 #!/bin/bash
 set -e
 
@@ -16,18 +15,18 @@ SS_PASS="gcp-xray"
 
 # 🗺️ FALLBACK REGIONS — EXACTLY AS REQUESTED ✅
 FALLBACK_REGIONS=(
-  "us-central1|Iowa, US 🇺🇸"
-  "us-east1|South Carolina, US 🇺🇸"
-  "us-east4|N. Virginia, US 🇺🇸"
-  "us-west1|Oregon, US 🇺🇸"
-  "asia-east1|Taiwan 🇹🇼"
-  "asia-southeast1|Singapore 🇸🇬 — BEST for PH"
-  "asia-northeast1|Tokyo, Japan 🇯🇵"
-  "asia-northeast3|Seoul, South Korea 🇰🇷"
-  "asia-south1|Mumbai, India 🇮🇳"
-  "europe-west1|Belgium 🇧🇪"
-  "europe-west4|Netherlands 🇳🇱"
-  "europe-west9|Paris, France 🇫🇷"
+  "us-central1"       # Iowa, US 🇺🇸
+  "us-east1"          # South Carolina, US 🇺🇸
+  "us-east4"          # N. Virginia, US 🇺🇸
+  "us-west1"          # Oregon, US 🇺🇸
+  "asia-east1"        # Taiwan 🇹🇼
+  "asia-southeast1"   # Singapore 🇸🇬 — BEST for PH
+  "asia-northeast1"   # Tokyo, Japan 🇯🇵
+  "asia-northeast3"   # Seoul, South Korea 🇰🇷
+  "asia-south1"       # Mumbai, India 🇮🇳
+  "europe-west1"     # Belgium 🇧🇪
+  "europe-west4"     # Netherlands 🇳🇱
+  "europe-west9"     # Paris, France 🇫🇷
 )
 # ==============================================
 
@@ -50,19 +49,35 @@ fi
 echo "✅ Project: $PROJECT_ID"
 echo ""
 
-# 🌍 REGION SELECTOR — CURATED WITH FLAGS ✅
-echo "🌍 Loading regions..."
-REGION_LIST=("${FALLBACK_REGIONS[@]}")
-echo "✅ Curated regions loaded: ${#REGION_LIST[@]} regions"
+# 🌍 REGION SELECTOR — FIXED AUTO-FETCH ✅
+echo "🌍 Checking available regions..."
+AVAILABLE_REGIONS_RAW=$(gcloud run regions list --format="value(name)" 2>/dev/null)
+
+REGION_LIST=()
+if [ -n "$AVAILABLE_REGIONS_RAW" ]; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    REGION_CLEAN="${line##*/}"
+    REGION_LIST+=("$REGION_CLEAN")
+  done <<< "$AVAILABLE_REGIONS_RAW"
+
+  if [ ${#REGION_LIST[@]} -lt 3 ]; then
+    echo "⚠️  Limited results — using curated region list"
+    REGION_LIST=("${FALLBACK_REGIONS[@]}")
+  else
+    echo "✅ Available regions loaded: ${#REGION_LIST[@]} regions"
+  fi
+else
+  echo "⚠️  Could not fetch regions — using curated list"
+  REGION_LIST=("${FALLBACK_REGIONS[@]}")
+fi
 
 # 🗺️ SELECTION LOOP — WITH EXIT ✅
 while true; do
   echo ""
   echo "🗺️  Select Region:"
   for i in "${!REGION_LIST[@]}"; do
-    CODE="${REGION_LIST[$i]%%|*}"
-    DESC="${REGION_LIST[$i]#*|}"
-    printf "   [%2d] %-16s — %s\n" "$((i+1))" "$CODE" "$DESC"
+    printf "   [%2d] %s\n" "$((i+1))" "${REGION_LIST[$i]}"
   done
   echo "   [ M ] Manual input — type your own region code"
   echo "   [ E ] Exit — Close Cloud Shell"
@@ -86,8 +101,7 @@ while true; do
       ;;
     [0-9]*)
       if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_LIST[@]} ]; then
-        SELECTED_ITEM="${REGION_LIST[$((CHOICE-1))]}"
-        REGION="${SELECTED_ITEM%%|*}"
+        REGION="${REGION_LIST[$((CHOICE-1))]}"
         echo "✅ Selected: $REGION"
         break
       else
@@ -157,10 +171,10 @@ frontend http-in
     acl xray_ss path_beg /xray-ss
     acl is_websocket hdr_upgrade -i websocket
     
-    use_backend vless_back if xray_vless
-    use_backend vmess_back if xray_vmess
-    use_backend trojan_back if xray_trojan
-    use_backend ss_back if xray_ss
+    use_backend vless_back if xray_vless or is_websocket
+    use_backend vmess_back if xray_vmess or is_websocket
+    use_backend trojan_back if xray_trojan or is_websocket
+    use_backend ss_back if xray_ss or is_websocket
     default_backend decoy_back
 
 backend vless_back
@@ -316,14 +330,14 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — FIXED latest Xray download URL ✅ ===
+# === Dockerfile — FIXED supervisor package & latest release URL ✅ ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
 RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
     rm -rf /var/cache/apk/*
 
-# Install Latest Xray
+# Install Xray (Using latest release to avoid 404)
 RUN mkdir -p /opt/xray && \
     curl -fSL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
     unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
@@ -348,7 +362,7 @@ echo ""
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest"
 
 echo "🐳 Building container image..."
-docker build --platform linux/amd64 -t "$IMAGE_URI" . >/dev/null
+docker build --no-cache --platform linux/amd64 -t "$IMAGE_URI" . >/dev/null
 
 echo "📤 Pushing to Artifact Registry..."
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
@@ -410,5 +424,3 @@ echo "   Password: $SS_PASS"
 echo "=========================================="
 echo "🔧 Powered by: Supervisord — Auto-Restart Enabled ✅"
 echo "🛡️  Anti-DDoS: Rate Limiting + Connection Protection ✅"
-EOF
-chmod +x hapsord1.sh && ./hapsord1.sh
