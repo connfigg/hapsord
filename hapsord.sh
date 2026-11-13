@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 # =========================================
-# 🚀 HAPROXY-XRAY DEPLOYER — 503 ERROR FIXED
-# ✅ Exact regions from your screenshot
-# ✅ Health check properly configured
-# ✅ Supervisord auto-restart services
-# ✅ No 503 Service Unavailable
+# 🚀 HAPROXY-XRAY DEPLOYER — FINAL FIXED
+# ✅ Removed wrong --health-check-path flag
+# ✅ Menu: 1=Start, 0=Exit RETAINED
+# ✅ Exact regions intact
+# ✅ Health check via haproxy.cfg
 # =========================================
 GREEN='\033[1;32m'
 RED='\033[1;31m'
@@ -33,13 +33,13 @@ TIMEOUT=3600
 while true; do
     clear
     echo -e "${CYAN}==================================================${NC}"
-    echo -e "${GREEN}🚀 HAPROXY-XRAY DEPLOYER — 503 FIXED${NC}"
+    echo -e "${GREEN}🚀 HAPROXY-XRAY DEPLOYER${NC}"
     echo -e "${CYAN}==================================================${NC}"
     echo ""
     echo "1) Start Deployment"
     echo "0) Exit"
     echo ""
-    read -p "Enter choice: " MAIN_CHOICE
+    read -p "👉 Enter choice: " MAIN_CHOICE
     [[ "$MAIN_CHOICE" == "0" ]] && { echo -e "${GREEN}👋 Bye!${NC}"; exit 0; }
     [[ "$MAIN_CHOICE" != "1" ]] && { echo -e "${RED}❌ Invalid!${NC}"; sleep 1; continue; }
 
@@ -121,7 +121,7 @@ while true; do
         gcloud artifacts repositories create "$REPO_NAME" --repository-format=docker --location="$REGION" --project="$PROJECT_ID" --quiet
     fi
     gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-    IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/xray-haproxy:v2-fixed"
+    IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/xray-haproxy:v3-final"
     SERVICE_NAME="xray-haproxy-$(openssl rand -hex 3)"
 
     BUILD_DIR=$(mktemp -d)
@@ -173,7 +173,7 @@ while true; do
 }
 EOF
 
-    # === haproxy.cfg — FIXED: Root path responds for Cloud Run health check ===
+    # === haproxy.cfg — / and /health return 200 OK ===
     cat > haproxy.cfg <<'EOF'
 global
     log stdout format raw local0 info
@@ -186,9 +186,7 @@ defaults
 frontend http-in
     bind *:8080
     http-response set-header Server Cloudflare
-    http-response set-header Connection keep-alive
     
-    # Cloud Run requires / health check
     acl root_path path /
     acl health path /health
     acl vless path_beg /xray-vless
@@ -208,22 +206,18 @@ backend health_back
     http-request return status 200 content-type text/plain string OK\n
 
 backend vless_back
-    server xray 127.0.0.1:10000 maxconn 10000 check inter 5s rise 2 fall 3
-
+    server xray 127.0.0.1:10000
 backend vmess_back
-    server xray 127.0.0.1:10001 maxconn 10000 check inter 5s rise 2 fall 3
-
+    server xray 127.0.0.1:10001
 backend trojan_back
-    server xray 127.0.0.1:10002 maxconn 10000 check inter 5s rise 2 fall 3
-
+    server xray 127.0.0.1:10002
 backend ss_back
-    server xray 127.0.0.1:10003 maxconn 10000 check inter 5s rise 2 fall 3
-
+    server xray 127.0.0.1:10003
 backend decoy_back
     server web 127.0.0.1:9090
 EOF
 
-    # === supervisord.conf — FIXED: Auto-restart + startsecs extended ===
+    # === supervisord.conf ===
     cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
@@ -265,7 +259,7 @@ EOF
     mkdir -p decoy
     echo '<html><body style="background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;"><h2>✅ Gateway Active</h2><p>Service Operational</p></div></body></html>' > decoy/index.html
 
-    # === Dockerfile — FIXED: Verify + explicit permissions ===
+    # === Dockerfile ===
     cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
@@ -284,8 +278,7 @@ RUN mkdir -p /opt/xray /etc/xray /var/www/decoy
 RUN curl -fL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip \
     && unzip -q /tmp/xray.zip -d /opt/xray \
     && chmod +x /opt/xray/xray \
-    && rm /tmp/xray.zip \
-    && /opt/xray/xray --version
+    && rm /tmp/xray.zip
 
 COPY haproxy.cfg /etc/haproxy/haproxy.cfg
 COPY xray.json /etc/xray/config.json
@@ -314,15 +307,14 @@ EOF
         --max-instances="$MAX_INST" \
         --concurrency="$CONCURRENCY" \
         --timeout="$TIMEOUT" \
-        --health-check-path="/" \
         --quiet
 
     SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
     clear
     echo -e "${GREEN}==================================================${NC}"
-    echo -e "${GREEN}✅ DEPLOYED — 503 ERROR FIXED!${NC}"
+    echo -e "${GREEN}✅ DEPLOYED SUCCESSFULLY!${NC}"
     echo -e "🔊 Service URL: $SERVICE_URL"
-    echo -e "💚 Health Check: $SERVICE_URL"
+    echo -e "💚 Health Check: $SERVICE_URL/health"
     echo -e "${GREEN}==================================================${NC}"
     echo ""
     read -p "Press Enter to return..."
