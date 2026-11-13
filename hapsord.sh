@@ -1,11 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 # =========================================
-# 🚀 HAPROXY-XRAY DEPLOYER — FINAL FIXED
-# ✅ REGION SELECT + MANUAL INPUT
-# ✅ EXIT OPTION
-# ✅ UPDATED PATHS
-# ✅ FIXED XRAY DOWNLOAD LINK
+# 🚀 HAPROXY-XRAY DEPLOYER — FIXED VERSION
+# ✅ No syntax errors
+# ✅ All EOF blocks properly closed
+# ✅ Region select + Manual input
+# ✅ Exit option
+# ✅ Updated paths
+# ✅ Fixed Xray download link
 # =========================================
 GREEN='\033[1;32m'
 RED='\033[1;31m'
@@ -47,12 +49,12 @@ while true; do
     echo "0) Exit"
     echo ""
     read -p "👉 Enter choice: " MAIN_CHOICE
-    
+
     if [[ "$MAIN_CHOICE" == "0" ]]; then
         echo -e "${GREEN}👋 Goodbye!${NC}"
         exit 0
     fi
-    
+
     if [[ "$MAIN_CHOICE" != "1" ]]; then
         echo -e "${RED}❌ Invalid choice!${NC}"
         sleep 1.5
@@ -60,7 +62,7 @@ while true; do
     fi
 
     # ==============================================
-    # 🗺️  REGION SELECT — WITH MANUAL INPUT
+    # 🗺️  REGION SELECT
     # ==============================================
     clear
     echo -e "${CYAN}=========================================${NC}"
@@ -85,20 +87,18 @@ while true; do
     echo "11) europe-west4     🇳🇱 Netherlands"
     echo "12) europe-west9     🇫🇷 Paris"
     echo ""
-    echo "99) ✏️  Manual Input (Type region code yourself)"
+    echo "99) ✏️  Manual Input"
     echo "0) 🔙 Back / Exit"
     echo ""
     read -p "👉 Enter number: " NUM
 
-    # Back/Exit option
     if [[ "$NUM" == "0" ]]; then
         continue
     fi
 
-    # Manual input option
     if [[ "$NUM" == "99" ]]; then
         echo ""
-        read -p "Enter region code (e.g., asia-southeast1): " REGION
+        read -p "Enter region code: " REGION
         if [[ -z "$REGION" ]]; then
             echo -e "${RED}❌ Region cannot be empty!${NC}"
             sleep 1.5
@@ -106,7 +106,6 @@ while true; do
         fi
         echo -e "${GREEN}✅ Manual Region:${NC} $REGION"
     else
-        # Preset region selection
         case $NUM in
             1) REGION="asia-southeast1" ;;
             2) REGION="asia-east1" ;;
@@ -134,7 +133,7 @@ while true; do
         echo -e "${RED}❌ No GCP project set!${NC}"
         echo "Run: gcloud config set project YOUR_PROJECT_ID"
         echo ""
-        read -p "Press Enter to return to menu..."
+        read -p "Press Enter to return..."
         continue
     fi
     echo -e "${GREEN}✅ Project:${NC} $PROJECT_ID"
@@ -170,7 +169,7 @@ while true; do
     cd "$BUILD_DIR" || exit 1
 
     # XRAY CONFIG
-    cat > xray.json <<JSON
+    cat > xray.json <<EOF
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
@@ -205,10 +204,10 @@ while true; do
   ],
   "outbounds": [{ "protocol": "freedom" }]
 }
-JSON
+EOF
 
     # HAPROXY CONFIG
-    cat > haproxy.cfg <<'EOF'
+    cat > haproxy.cfg <<EOF
 global
     log stdout format raw local0 info
     maxconn 10000
@@ -246,7 +245,7 @@ backend decoy_back
 EOF
 
     # SUPERVISORD
-    cat > supervisord.conf <<'EOF'
+    cat > supervisord.conf <<EOF
 [supervisord]
 nodaemon=true
 user=root
@@ -266,9 +265,9 @@ autorestart=true
 startsecs=3
 EOF
 
-    # SIMPLE DECOY
+    # DECOY PAGE
     mkdir -p decoy
-    cat > decoy/index.html <<'EOF'
+    cat > decoy/index.html <<EOF
 <!DOCTYPE html>
 <html>
 <head>
@@ -290,26 +289,15 @@ EOF
 </html>
 EOF
 
-    # ==============================================
-    # 📄 DOCKERFILE — FIXED XRAY DOWNLOAD LINK
-    # ==============================================
-    cat > Dockerfile <<'EOF'
+    # DOCKERFILE
+    cat > Dockerfile <<EOF
 FROM alpine:3.20
-
-RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
-    rm -rf /var/cache/apk/*
-
-RUN mkdir -p /opt/xray && \
-    curl -fL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
-    unzip /tmp/xray.zip -d /opt/xray && \
-    chmod +x /opt/xray/xray && \
-    rm /tmp/xray.zip
-
+RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && rm -rf /var/cache/apk/*
+RUN mkdir -p /opt/xray && curl -fL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
 COPY haproxy.cfg /etc/haproxy/haproxy.cfg
 COPY xray.json /etc/xray/config.json
 COPY supervisord.conf /etc/supervisord.conf
 COPY decoy /var/www/decoy
-
 EXPOSE 8080
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
 EOF
@@ -349,7 +337,7 @@ EOF
     echo -e "🌍 Region:     $REGION"
     echo -e "🔗 Service:   $SERVICE_URL"
     echo -e "💚 Health:     $SERVICE_URL/health"
-    echo -e ""
+    echo ""
     echo -e "${GREEN}Paths:${NC}"
     echo -e "  VLESS:   $SERVICE_URL/xray-vless"
     echo -e "  VMess:   $SERVICE_URL/xray-vmess"
