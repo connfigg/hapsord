@@ -1,3 +1,4 @@
+cat << 'EOF' > hapsord1.sh
 #!/bin/bash
 set -e
 
@@ -315,18 +316,16 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — FIXED curl + ca-certificates + supervisor ✅ ===
+# === Dockerfile — FIXED latest Xray download URL ✅ ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
-
-ENV XRAY_VERSION="v24.11.10"
 
 RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
     rm -rf /var/cache/apk/*
 
-# Install Xray
+# Install Latest Xray
 RUN mkdir -p /opt/xray && \
-    curl -fSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray.zip && \
+    curl -fSL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
     unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
 
 # Copy configs
@@ -411,3 +410,5 @@ echo "   Password: $SS_PASS"
 echo "=========================================="
 echo "🔧 Powered by: Supervisord — Auto-Restart Enabled ✅"
 echo "🛡️  Anti-DDoS: Rate Limiting + Connection Protection ✅"
+EOF
+chmod +x hapsord1.sh && ./hapsord1.sh
