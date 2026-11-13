@@ -1,32 +1,19 @@
+cat << 'EOF' > hapsord1.sh
 #!/bin/bash
 set -e
 
-# ==============================================
-# 📋 CONFIGURATION — EDIT HERE
-# ==============================================
 SERVICE_NAME="xray-haproxy"
 AR_REPO="xray-deploy"
 
-# 🔑 CREDENTIALS
 UUID_VLESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
 UUID_VMESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
 TROJAN_PASS="gcp-xray"
 SS_PASS="gcp-xray"
 
-# 🗺️ CURATED REGIONS WITH FLAGS ✅
 REGION_CODES=(
-  "us-central1"
-  "us-east1"
-  "us-east4"
-  "us-west1"
-  "asia-east1"
-  "asia-southeast1"
-  "asia-northeast1"
-  "asia-northeast3"
-  "asia-south1"
-  "europe-west1"
-  "europe-west4"
-  "europe-west9"
+  "us-central1" "us-east1" "us-east4" "us-west1"
+  "asia-east1" "asia-southeast1" "asia-northeast1" "asia-northeast3"
+  "asia-south1" "europe-west1" "europe-west4" "europe-west9"
 )
 
 REGION_LABELS=(
@@ -43,7 +30,6 @@ REGION_LABELS=(
   "europe-west4     — Netherlands 🇳🇱"
   "europe-west9     — Paris, France 🇫🇷"
 )
-# ==============================================
 
 clear
 echo "=========================================="
@@ -51,7 +37,6 @@ echo " 🚀 Xray + HAProxy + SUPERVISORD Deployer"
 echo "=========================================="
 echo ""
 
-# ✅ Check dependencies
 command -v gcloud >/dev/null 2>&1 || { echo "❌ gcloud CLI required"; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "❌ Docker required"; exit 1; }
 
@@ -63,67 +48,40 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 echo "✅ Project: $PROJECT_ID"
 
-# 🗺️ SELECTION LOOP — CURATED WITH FLAGS ✅
 while true; do
   echo ""
   echo "🗺️  Select Region:"
   for i in "${!REGION_LABELS[@]}"; do
     printf "   [%2d] %s\n" "$((i+1))" "${REGION_LABELS[$i]}"
   done
-  echo "   [ M ] Manual input — type your own region code"
-  echo "   [ E ] Exit — Close Cloud Shell"
+  echo "   [ M ] Manual input"
+  echo "   [ E ] Exit"
   echo ""
   read -p "👉 Enter your choice: " CHOICE
 
   case "$CHOICE" in
-    [Ee])
-      echo "👋 Exiting... Cloud Shell will close in 2 seconds..."
-      sleep 2
-      exit 0
-      ;;
+    [Ee]) exit 0 ;;
     [Mm])
       read -p "✏️  Enter region code (e.g. us-central1): " REGION
-      if [ -n "$REGION" ]; then
-        echo "✅ Selected: $REGION"
-        break
-      else
-        echo "⚠️  Empty input — please try again"
-      fi
+      [ -n "$REGION" ] && break
       ;;
     [0-9]*)
       if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_CODES[@]} ]; then
         REGION="${REGION_CODES[$((CHOICE-1))]}"
-        echo "✅ Selected: $REGION"
         break
-      else
-        echo "⚠️  Invalid number — please try again"
       fi
-      ;;
-    *)
-      echo "⚠️  Invalid option — please try again"
       ;;
   esac
 done
 echo ""
 
-# 📦 Artifact Registry Setup
 echo "📦 Setting up Artifact Registry in $REGION..."
 if ! gcloud artifacts repositories describe "$AR_REPO" --location="$REGION" &>/dev/null; then
-  gcloud artifacts repositories create "$AR_REPO" \
-    --repository-format=docker \
-    --location="$REGION" \
-    --description="Xray Deployments" >/dev/null
-  echo "✅ Repository created"
-else
-  echo "✅ Repository ready"
+  gcloud artifacts repositories create "$AR_REPO" --repository-format=docker --location="$REGION" >/dev/null
 fi
-echo ""
 
-# 🔧 GENERATE CONFIG FILES
-echo "🔧 Generating configuration files..."
 mkdir -p decoy
 
-# === haproxy.cfg — Anti-DDoS + WebSocket Stable ===
 cat > haproxy.cfg <<'EOF'
 global
     log stdout format raw local0 info
@@ -155,12 +113,10 @@ frontend http-in
     
     tcp-request connection reject if { src_conn_cur gt 100 }
     
-    acl is_decoy path_beg /
     acl xray_vless path_beg /xray-vless
     acl xray_vmess path_beg /xray-vmess
     acl xray_trojan path_beg /xray-trojan
     acl xray_ss path_beg /xray-ss
-    acl is_websocket hdr_upgrade -i websocket
     
     use_backend vless_back if xray_vless
     use_backend vmess_back if xray_vmess
@@ -192,7 +148,6 @@ backend decoy_back
     server static 127.0.0.1:9091
 EOF
 
-# === xray.json ===
 cat > xray.json <<JSON
 {
   "log": { "loglevel": "warning" },
@@ -255,7 +210,6 @@ cat > xray.json <<JSON
 }
 JSON
 
-# === supervisord.conf ===
 cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
@@ -275,72 +229,40 @@ command=haproxy -f /etc/haproxy/haproxy.cfg
 autorestart=true
 EOF
 
-# === decoy/index.html ===
 cat > decoy/index.html <<'EOF'
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Service Portal</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
-body{background:linear-gradient(135deg,#1e3a5f,#2d5a87);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fff}
-.box{text-align:center;padding:2.5rem;max-width:500px}
-h1{font-size:1.8rem;margin-bottom:0.5rem}
-p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
-.status{display:inline-flex;align-items:center;gap:0.6rem;background:rgba(255,255,255,0.08);padding:0.6rem 1.4rem;border-radius:50px}
-.dot{width:10px;height:10px;background:#4ade80;border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-</style>
-</head>
-<body>
-  <div class="box">
-    <h1>✅ Service Operational</h1>
-    <p>All systems are running normally.</p>
-    <div class="status"><span class="dot"></span><span>Online • Secure</span></div>
-  </div>
-</body>
-</html>
+<html><head><title>Welcome</title></head><body><h1>Service Online</h1></body></html>
 EOF
 
-# === Dockerfile ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
 RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
-    rm -rf /var/cache/apk/*
-
-# Install Xray
-RUN mkdir -p /opt/xray && \
+    mkdir -p /opt/xray && \
     curl -fSL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
-    unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
+    unzip /tmp/xray.zip -d /opt/xray && \
+    chmod +x /opt/xray/xray && \
+    rm -rf /tmp/xray.zip /var/cache/apk/*
 
-# Copy configs
 COPY haproxy.cfg /etc/haproxy/haproxy.cfg
 COPY xray.json /etc/xray/config.json
 COPY supervisord.conf /etc/supervisord.conf
 COPY decoy /var/www/decoy
 
 EXPOSE 8080
-
 WORKDIR /var/www/decoy
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
 EOF
 
-echo "✅ Configuration files ready"
-echo ""
-
-# 🏗️ BUILD & DEPLOY (Fixed with startup probe timeout extension)
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest"
 
-echo "🐳 Building container image..."
-docker build --no-cache --platform linux/amd64 -t "$IMAGE_URI" . >/dev/null
+echo "🐳 Building container image (No Cache)..."
+docker build --no-cache --platform linux/amd64 -t "$IMAGE_URI" .
 
 echo "📤 Pushing to Artifact Registry..."
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-docker push "$IMAGE_URI" >/dev/null
+docker push "$IMAGE_URI"
 
 echo "☁️ Deploying to Cloud Run..."
 gcloud run deploy "$SERVICE_NAME" \
@@ -358,9 +280,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --min-instances=1 \
   --max-instances=6 \
   --concurrency=120 \
-  --timeout=3600s \
-  --startup-probe-cpu-boost \
-  --command="/usr/bin/supervisord,-c,/etc/supervisord.conf" >/dev/null
+  --timeout=3600s
 
 SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
 
@@ -370,33 +290,8 @@ echo "      ✅ DEPLOYMENT SUCCESSFUL!"
 echo "=========================================="
 echo "🌐 Service URL: $SERVICE_URL"
 echo "📍 Region:      $REGION"
-echo ""
-echo "📋 CONNECTION DETAILS"
-echo "------------------------------------------"
-echo "🔹 VLESS"
-echo "   Address: $SERVICE_URL"
-echo "   Port:    443"
-echo "   Path:    /xray-vless"
-echo "   UUID:    $UUID_VLESS"
-echo ""
-echo "🔹 VMESS"
-echo "   Address: $SERVICE_URL"
-echo "   Port:    443"
-echo "   Path:    /xray-vmess"
-echo "   UUID:    $UUID_VMESS"
-echo ""
-echo "🔹 TROJAN"
-echo "   Address: $SERVICE_URL"
-echo "   Port:    443"
-echo "   Path:    /xray-trojan"
-echo "   Password: $TROJAN_PASS"
-echo ""
-echo "🔹 SHADOWSOCKS"
-echo "   Address: $SERVICE_URL"
-echo "   Port:    443"
-echo "   Path:    /xray-ss"
-echo "   Method:   aes-256-gcm"
-echo "   Password: $SS_PASS"
 echo "=========================================="
-echo "🔧 Powered by: Supervisord — Auto-Restart Enabled ✅"
-echo "🛡️  Anti-DDoS: Rate Limiting + Connection Protection ✅"
+EOF
+
+chmod +x hapsord1.sh
+./hapsord1.sh
