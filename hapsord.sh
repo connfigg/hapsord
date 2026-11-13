@@ -1,17 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 # =========================================
-# 🚀 HAPROXY-XRAY DEPLOYER — FINAL FIXED
-# ✅ Removed wrong --health-check-path flag
-# ✅ Menu: 1=Start, 0=Exit RETAINED
-# ✅ Exact regions intact
-# ✅ Health check via haproxy.cfg
+# 🚀 HAPROXY-XRAY DEPLOYER — CLEAN VERSION
+# ✅ UUID/PASSWORD/PATH direct sa JSON
+# ✅ Menu + regions intact
+# ✅ All deploy flags included
 # =========================================
 GREEN='\033[1;32m'
 RED='\033[1;31m'
 YELLOW='\033[1;33m'
 CYAN='\033[1;36m'
 NC='\033[0m'
+
+MEMORY="2Gi"
+CPU="2"
+MIN_INST=1
+MAX_INST=6
+CONCURRENCY=120
+TIMEOUT=3600
 
 while true; do
     clear
@@ -104,15 +110,15 @@ while true; do
         gcloud artifacts repositories create "$REPO_NAME" --repository-format=docker --location="$REGION" --project="$PROJECT_ID" --quiet
     fi
     gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-    IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/xray-haproxy:v3-final"
+    IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/xray-haproxy:clean"
     SERVICE_NAME="xray-haproxy-$(openssl rand -hex 3)"
 
     BUILD_DIR=$(mktemp -d)
     trap 'rm -rf "$BUILD_DIR"' EXIT
     cd "$BUILD_DIR" || exit 1
 
-    # === xray.json ===
-    cat > xray.json <<EOF
+    # === xray.json — direct values ===
+    cat > xray.json <<'EOF'
 {
   "log": {
     "loglevel": "info",
@@ -156,7 +162,7 @@ while true; do
 }
 EOF
 
-    # === haproxy.cfg — / and /health return 200 OK ===
+    # === haproxy.cfg ===
     cat > haproxy.cfg <<'EOF'
 global
     log stdout format raw local0 info
@@ -279,8 +285,9 @@ EOF
     echo -e "${CYAN}🚀 Deploying to Cloud Run...${NC}"
     gcloud run deploy "$SERVICE_NAME" \
         --image="$IMAGE_TAG" \
-        --region="$REGION" \
+        --project="$PROJECT_ID" \
         --platform=managed \
+        --region="$REGION" \
         --port=8080 \
         --allow-unauthenticated \
         --no-cpu-throttling \
@@ -291,6 +298,8 @@ EOF
         --concurrency="120" \
         --timeout="3600" \
         --session-affinity \
+        --execution-environment=gen2 \
+        --cpu-boost \
         --quiet
 
     SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
