@@ -255,7 +255,7 @@ cat > xray.json <<JSON
 }
 JSON
 
-# === supervisord.conf — FIXED LOGGING (No Invalid Seek Error) ===
+# === supervisord.conf — INSTANT START (No Startup Delay) ===
 cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
@@ -265,20 +265,17 @@ user=root
 command=python3 -m http.server 9091
 directory=/var/www/decoy
 autorestart=true
-startsecs=3
-stopwaitsecs=5
+startsecs=1
 
 [program:xray]
 command=/opt/xray/xray run -config /etc/xray/config.json
 autorestart=true
-startsecs=5
-stopwaitsecs=10
+startsecs=1
 
 [program:haproxy]
 command=haproxy -f /etc/haproxy/haproxy.cfg
 autorestart=true
-startsecs=3
-stopwaitsecs=5
+startsecs=1
 EOF
 
 # === decoy/index.html ===
@@ -310,14 +307,14 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — FIXED supervisor package & latest release URL ✅ ===
+# === Dockerfile ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
 RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
     rm -rf /var/cache/apk/*
 
-# Install Xray (Using latest release to avoid 404)
+# Install Xray
 RUN mkdir -p /opt/xray && \
     curl -fSL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
     unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
@@ -385,11 +382,13 @@ echo "   UUID:    $UUID_VLESS"
 echo ""
 echo "🔹 VMESS"
 echo "   Address: $SERVICE_URL"
+echo "   Port:    443"
 echo "   Path:    /xray-vmess"
 echo "   UUID:    $UUID_VMESS"
 echo ""
 echo "🔹 TROJAN"
 echo "   Address: $SERVICE_URL"
+echo "   Port:    443"
 echo "   Path:    /xray-trojan"
 echo "   Password: $TROJAN_PASS"
 echo ""
