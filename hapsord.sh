@@ -1,10 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 # =========================================
-# 🚀 HAPROXY-XRAY DEPLOYER
+# 🚀 HAPROXY-XRAY DEPLOYER — FINAL FIXED
 # ✅ REGION SELECT + MANUAL INPUT
 # ✅ EXIT OPTION
 # ✅ UPDATED PATHS
+# ✅ FIXED XRAY DOWNLOAD LINK
 # =========================================
 GREEN='\033[1;32m'
 RED='\033[1;31m'
@@ -25,7 +26,7 @@ PATH_VMESS="/xray-vmess"
 PATH_TROJAN="/xray-trojan"
 PATH_SS="/xray-ss"
 
-MEMORY="2Gi"
+MEMORY="1Gi"
 CPU="2"
 MIN_INST=1
 MAX_INST=5
@@ -59,7 +60,7 @@ while true; do
     fi
 
     # ==============================================
-    # 🗺️  REGION SELECT — WITH MANUAL OPTION
+    # 🗺️  REGION SELECT — WITH MANUAL INPUT
     # ==============================================
     clear
     echo -e "${CYAN}=========================================${NC}"
@@ -289,23 +290,29 @@ EOF
 </html>
 EOF
 
-    # DOCKERFILE — FIXED: GAMITON ANG LATEST LINK (walay version number)
- cat > Dockerfile <<'EOF'
- FROM alpine:3.20
- RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
-     rm -rf /var/cache/apk/*
- RUN mkdir -p /opt/xray && \
-     curl -fL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
-     unzip /tmp/xray.zip -d /opt/xray && \
-     chmod +x /opt/xray/xray && \
-     rm /tmp/xray.zip
- COPY haproxy.cfg /etc/haproxy/haproxy.cfg
- COPY xray.json /etc/xray/config.json
- COPY supervisord.conf /etc/supervisord.conf
- COPY decoy /var/www/decoy
- EXPOSE 8080
- ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
- EOF
+    # ==============================================
+    # 📄 DOCKERFILE — FIXED XRAY DOWNLOAD LINK
+    # ==============================================
+    cat > Dockerfile <<'EOF'
+FROM alpine:3.20
+
+RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
+    rm -rf /var/cache/apk/*
+
+RUN mkdir -p /opt/xray && \
+    curl -fL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
+    unzip /tmp/xray.zip -d /opt/xray && \
+    chmod +x /opt/xray/xray && \
+    rm /tmp/xray.zip
+
+COPY haproxy.cfg /etc/haproxy/haproxy.cfg
+COPY xray.json /etc/xray/config.json
+COPY supervisord.conf /etc/supervisord.conf
+COPY decoy /var/www/decoy
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+EOF
 
     # ==============================================
     # 🔨 BUILD & DEPLOY
