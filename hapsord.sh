@@ -142,31 +142,31 @@ while true; do
       "listen": "127.0.0.1",
       "protocol": "vless",
       "settings": {
-        "clients": [{"id": "$UUID_VLESS"}],
+        "clients": [{"id": "a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"}],
         "decryption": "none"
       },
-      "streamSettings": {"network": "ws", "wsSettings": {"path": "$PATH_VLESS"}}
+      "streamSettings": {"network": "ws", "wsSettings": {"path": "/xray-vless"}}
     },
     {
       "port": 10001,
       "listen": "127.0.0.1",
       "protocol": "vmess",
-      "settings": {"clients": [{"id": "$UUID_VMESS", "alterId": 0}]},
-      "streamSettings": {"network": "ws", "wsSettings": {"path": "$PATH_VMESS"}}
+      "settings": {"clients": [{"id": "a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f", "alterId": 0}]},
+      "streamSettings": {"network": "ws", "wsSettings": {"path": "/xray-vmess"}}
     },
     {
       "port": 10002,
       "listen": "127.0.0.1",
       "protocol": "trojan",
-      "settings": {"clients": [{"password": "$TROJAN_PASS"}]},
-      "streamSettings": {"network": "ws", "wsSettings": {"path": "$PATH_TROJAN"}}
+      "settings": {"clients": [{"password": "gcp-xray"}]},
+      "streamSettings": {"network": "ws", "wsSettings": {"path": "/xray-trojan"}}
     },
     {
       "port": 10003,
       "listen": "127.0.0.1",
       "protocol": "shadowsocks",
-      "settings": {"servers": [{"address": "127.0.0.1", "port": 10003, "method": "aes-256-gcm", "password": "$SS_PASS"}]},
-      "streamSettings": {"network": "ws", "wsSettings": {"path": "$PATH_SS"}}
+      "settings": {"servers": [{"address": "127.0.0.1", "port": 10003, "method": "aes-256-gcm", "password": "gcp-xray"}]},
+      "streamSettings": {"network": "ws", "wsSettings": {"path": "/xray-ss"}}
     }
   ],
   "outbounds": [{"protocol": "freedom"}]
