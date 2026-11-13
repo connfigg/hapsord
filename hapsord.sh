@@ -13,23 +13,6 @@ YELLOW='\033[1;33m'
 CYAN='\033[1;36m'
 NC='\033[0m'
 
-UUID_VLESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
-UUID_VMESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
-TROJAN_PASS="gcp-xray"
-SS_PASS="gcp-xray"
-
-PATH_VLESS="/xray-vless"
-PATH_VMESS="/xray-vmess"
-PATH_TROJAN="/xray-trojan"
-PATH_SS="/xray-ss"
-
-MEMORY="2Gi"
-CPU="2"
-MIN_INST=1
-MAX_INST=6
-CONCURRENCY=120
-TIMEOUT=3600
-
 while true; do
     clear
     echo -e "${CYAN}==================================================${NC}"
