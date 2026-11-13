@@ -1,13 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 # =========================================
-# 🚀 HAPROXY-XRAY DEPLOYER — FIXED VERSION
+# 🚀 HAPROXY-XRAY DEPLOYER — FIXED
+# ✅ Removed --startup-period (not supported in Qwiklabs)
+# ✅ All features retained
 # ✅ No syntax errors
-# ✅ All EOF blocks properly closed
-# ✅ Region select + Manual input
-# ✅ Exit option
-# ✅ Updated paths
-# ✅ Fixed Xray download link
 # =========================================
 GREEN='\033[1;32m'
 RED='\033[1;31m'
@@ -28,7 +25,7 @@ PATH_VMESS="/xray-vmess"
 PATH_TROJAN="/xray-trojan"
 PATH_SS="/xray-ss"
 
-MEMORY="1Gi"
+MEMORY="2Gi"
 CPU="2"
 MIN_INST=1
 MAX_INST=5
@@ -303,7 +300,7 @@ ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
 EOF
 
     # ==============================================
-    # 🔨 BUILD & DEPLOY
+    # 🔨 BUILD & DEPLOY — FIXED: REMOVED --startup-period
     # ==============================================
     echo -e "${CYAN}🔨 Building image...${NC}"
     gcloud builds submit --project="$PROJECT_ID" --tag "$IMAGE_TAG" . --quiet
