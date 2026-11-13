@@ -162,10 +162,10 @@ frontend http-in
     acl xray_ss path_beg /xray-ss
     acl is_websocket hdr_upgrade -i websocket
     
-    use_backend vless_back if xray_vless
-    use_backend vmess_back if xray_vmess
-    use_backend trojan_back if xray_trojan
-    use_backend ss_back if xray_ss
+    use_backend vless_back if xray_vless or is_websocket
+    use_backend vmess_back if xray_vmess or is_websocket
+    use_backend trojan_back if xray_trojan or is_websocket
+    use_backend ss_back if xray_ss or is_websocket
     default_backend decoy_back
 
 backend vless_back
@@ -255,27 +255,40 @@ cat > xray.json <<JSON
 }
 JSON
 
-# === supervisord.conf — STABLE STARTUP TIMING ===
+# === supervisord.conf — FIXED: Mas taas nga startup time ✅ ===
 cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
 user=root
+logfile=/dev/stdout
+logfile_maxbytes=0
+loglevel=info
+startretries=5
 
 [program:decoy-server]
 command=python3 -m http.server 9091
 directory=/var/www/decoy
 autorestart=true
-startsecs=2
+startsecs=3
+stopwaitsecs=5
+stdout_logfile=/dev/stdout
+stderr_logfile=/dev/stderr
 
 [program:xray]
 command=/opt/xray/xray run -config /etc/xray/config.json
 autorestart=true
-startsecs=3
+startsecs=5
+stopwaitsecs=10
+stdout_logfile=/dev/stdout
+stderr_logfile=/dev/stderr
 
 [program:haproxy]
 command=haproxy -f /etc/haproxy/haproxy.cfg
 autorestart=true
-startsecs=2
+startsecs=3
+stopwaitsecs=5
+stdout_logfile=/dev/stdout
+stderr_logfile=/dev/stderr
 EOF
 
 # === decoy/index.html ===
@@ -307,16 +320,18 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile ===
+# === Dockerfile — FIXED: Versioned Xray download + STOPSIGNAL + ca-certificates ✅ ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
+
+ENV XRAY_VERSION="v24.11.10"
 
 RUN apk update && apk add --no-cache haproxy curl ca-certificates unzip python3 supervisor && \
     rm -rf /var/cache/apk/*
 
-# Install Xray
+# Install Xray — use versioned URL para dili mag-usab-usab
 RUN mkdir -p /opt/xray && \
-    curl -fSL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" -o /tmp/xray.zip && \
+    curl -fSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray.zip && \
     unzip /tmp/xray.zip -d /opt/xray && chmod +x /opt/xray/xray && rm /tmp/xray.zip
 
 # Copy configs
@@ -326,6 +341,7 @@ COPY supervisord.conf /etc/supervisord.conf
 COPY decoy /var/www/decoy
 
 EXPOSE 8080
+STOPSIGNAL SIGTERM
 
 WORKDIR /var/www/decoy
 
@@ -335,7 +351,7 @@ EOF
 echo "✅ Configuration files ready"
 echo ""
 
-# 🏗️ BUILD & DEPLOY
+# 🏗️ BUILD & DEPLOY — FIXED: Added --startup-period ✅
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest"
 
 echo "🐳 Building container image..."
@@ -361,7 +377,8 @@ gcloud run deploy "$SERVICE_NAME" \
   --min-instances=1 \
   --max-instances=6 \
   --concurrency=120 \
-  --timeout=3600s >/dev/null
+  --timeout=3600s \
+  --startup-period=60s >/dev/null
 
 SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
 
@@ -401,3 +418,4 @@ echo "   Password: $SS_PASS"
 echo "=========================================="
 echo "🔧 Powered by: Supervisord — Auto-Restart Enabled ✅"
 echo "🛡️  Anti-DDoS: Rate Limiting + Connection Protection ✅"
+echo "⏱️  Startup Period: 60 seconds ✅"
