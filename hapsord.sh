@@ -322,7 +322,6 @@ EOF
         --max-instances="$MAX_INST" \
         --concurrency="$CONCURRENCY" \
         --timeout="$TIMEOUT" \
-        --startup-period=60s \
         --quiet
 
     # ==============================================
