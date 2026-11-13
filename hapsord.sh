@@ -13,20 +13,35 @@ UUID_VMESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
 TROJAN_PASS="gcp-xray"
 SS_PASS="gcp-xray"
 
-# 🗺️ FALLBACK REGIONS — EXACTLY AS REQUESTED ✅
-FALLBACK_REGIONS=(
-  "us-central1"       # Iowa, US 🇺🇸
-  "us-east1"          # South Carolina, US 🇺🇸
-  "us-east4"          # N. Virginia, US 🇺🇸
-  "us-west1"          # Oregon, US 🇺🇸
-  "asia-east1"        # Taiwan 🇹🇼
-  "asia-southeast1"   # Singapore 🇸🇬 — BEST for PH
-  "asia-northeast1"   # Tokyo, Japan 🇯🇵
-  "asia-northeast3"   # Seoul, South Korea 🇰🇷
-  "asia-south1"       # Mumbai, India 🇮🇳
-  "europe-west1"     # Belgium 🇧🇪
-  "europe-west4"     # Netherlands 🇳🇱
-  "europe-west9"     # Paris, France 🇫🇷
+# 🗺️ CURATED REGIONS WITH FLAGS ✅
+REGION_CODES=(
+  "us-central1"
+  "us-east1"
+  "us-east4"
+  "us-west1"
+  "asia-east1"
+  "asia-southeast1"
+  "asia-northeast1"
+  "asia-northeast3"
+  "asia-south1"
+  "europe-west1"
+  "europe-west4"
+  "europe-west9"
+)
+
+REGION_LABELS=(
+  "us-central1      — Iowa, US 🇺🇸"
+  "us-east1         — South Carolina, US 🇺🇸"
+  "us-east4         — N. Virginia, US 🇺🇸"
+  "us-west1         — Oregon, US 🇺🇸"
+  "asia-east1       — Taiwan 🇹🇼"
+  "asia-southeast1  — Singapore 🇸🇬 (BEST for PH)"
+  "asia-northeast1  — Tokyo, Japan 🇯🇵"
+  "asia-northeast3  — Seoul, South Korea 🇰🇷"
+  "asia-south1      — Mumbai, India 🇮🇳"
+  "europe-west1     — Belgium 🇧🇪"
+  "europe-west4     — Netherlands 🇳🇱"
+  "europe-west9     — Paris, France 🇫🇷"
 )
 # ==============================================
 
@@ -47,39 +62,13 @@ if [ -z "$PROJECT_ID" ]; then
   exit 1
 fi
 echo "✅ Project: $PROJECT_ID"
-echo ""
 
-# 🌍 REGION SELECTOR — FIXED AUTO-FETCH ✅
-echo "🌍 Checking available regions..."
-AVAILABLE_REGIONS_RAW=$(gcloud run regions list --format="value(name)" 2>/dev/null)
-
-REGION_LIST=()
-if [ -n "$AVAILABLE_REGIONS_RAW" ]; then
-  # ✅ Extract clean region codes — remove project/locations/ prefix
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    REGION_CLEAN="${line##*/}"
-    REGION_LIST+=("$REGION_CLEAN")
-  done <<< "$AVAILABLE_REGIONS_RAW"
-
-  # ✅ Verify we got valid regions — if not, use fallback
-  if [ ${#REGION_LIST[@]} -lt 3 ]; then
-    echo "⚠️  Limited results — using curated region list"
-    REGION_LIST=("${FALLBACK_REGIONS[@]}")
-  else
-    echo "✅ Available regions loaded: ${#REGION_LIST[@]} regions"
-  fi
-else
-  echo "⚠️  Could not fetch regions — using curated list"
-  REGION_LIST=("${FALLBACK_REGIONS[@]}")
-fi
-
-# 🗺️ SELECTION LOOP — WITH EXIT ✅
+# 🗺️ SELECTION LOOP — CURATED WITH FLAGS ✅
 while true; do
   echo ""
   echo "🗺️  Select Region:"
-  for i in "${!REGION_LIST[@]}"; do
-    printf "   [%2d] %s\n" "$((i+1))" "${REGION_LIST[$i]}"
+  for i in "${!REGION_LABELS[@]}"; do
+    printf "   [%2d] %s\n" "$((i+1))" "${REGION_LABELS[$i]}"
   done
   echo "   [ M ] Manual input — type your own region code"
   echo "   [ E ] Exit — Close Cloud Shell"
@@ -102,8 +91,8 @@ while true; do
       fi
       ;;
     [0-9]*)
-      if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_LIST[@]} ]; then
-        REGION="${REGION_LIST[$((CHOICE-1))]}"
+      if [ "$CHOICE" -ge 1 ] 2>/dev/null && [ "$CHOICE" -le ${#REGION_CODES[@]} ]; then
+        REGION="${REGION_CODES[$((CHOICE-1))]}"
         echo "✅ Selected: $REGION"
         break
       else
@@ -173,10 +162,10 @@ frontend http-in
     acl xray_ss path_beg /xray-ss
     acl is_websocket hdr_upgrade -i websocket
     
-    use_backend vless_back if xray_vless or is_websocket
-    use_backend vmess_back if xray_vmess or is_websocket
-    use_backend trojan_back if xray_trojan or is_websocket
-    use_backend ss_back if xray_ss or is_websocket
+    use_backend vless_back if xray_vless
+    use_backend vmess_back if xray_vmess
+    use_backend trojan_back if xray_trojan
+    use_backend ss_back if xray_ss
     default_backend decoy_back
 
 backend vless_back
@@ -332,13 +321,13 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — FIXED supervisord package name ✅ ===
+# === Dockerfile — FIXED 'supervisor' package name ✅ ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
 ENV XRAY_VERSION="v24.11.10"
 
-RUN apk update && apk add --no-cache haproxy wget unzip python3 supervisord && \
+RUN apk update && apk add --no-cache haproxy wget unzip python3 supervisor && \
     rm -rf /var/cache/apk/*
 
 # Install Xray
