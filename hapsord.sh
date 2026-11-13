@@ -301,12 +301,13 @@ EOF
         --port=8080 \
         --allow-unauthenticated \
         --no-cpu-throttling \
-        --cpu="$CPU" \
-        --memory="$MEMORY" \
-        --min-instances="$MIN_INST" \
-        --max-instances="$MAX_INST" \
-        --concurrency="$CONCURRENCY" \
-        --timeout="$TIMEOUT" \
+        --cpu="2" \
+        --memory="2Gi" \
+        --min-instances="1" \
+        --max-instances="6" \
+        --concurrency="120" \
+        --timeout="3600" \
+        --session-affinity \
         --quiet
 
     SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
