@@ -103,7 +103,7 @@ echo ""
 echo "🔧 Generating configuration files..."
 mkdir -p decoy
 
-# === haproxy.cfg — UPDATED: tunnel & keep-alive ===
+# === haproxy.cfg — Anti-DDoS + WebSocket Stable ===
 cat > haproxy.cfg <<'EOF'
 global
     log stdout format raw local0 info
@@ -235,7 +235,7 @@ cat > xray.json <<JSON
 }
 JSON
 
-# === supervisord.conf — NEW! ===
+# === supervisord.conf — Auto-Restart ===
 cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
@@ -301,7 +301,7 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — UPDATED: Supervisord Entrypoint ===
+# === Dockerfile — Supervisord Entrypoint ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
@@ -325,7 +325,7 @@ EXPOSE 8080
 
 WORKDIR /var/www/decoy
 
-# ✅ Supervisord as entrypoint — auto-restart each service
+# ✅ Supervisord — Auto-Restart for all services
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
 EOF
 
@@ -397,3 +397,4 @@ echo "   Method:   aes-256-gcm"
 echo "   Password: gcp-xray"
 echo "=========================================="
 echo "🔧 Powered by: Supervisord — Auto-Restart Enabled ✅"
+echo "🛡️  Anti-DDoS: Rate Limiting + Connection Protection ✅"
