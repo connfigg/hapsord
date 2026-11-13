@@ -13,17 +13,20 @@ UUID_VMESS="a2c4d6e8-f0b1-3c5d-7e9f-1a2b3c4d5e6f"
 TROJAN_PASS="gcp-xray"
 SS_PASS="gcp-xray"
 
-# 🗺️ FALLBACK REGIONS — KANUNAY GIGAMIT RA
+# 🗺️ FALLBACK REGIONS — EXACTLY AS REQUESTED ✅
 FALLBACK_REGIONS=(
-  "asia-southeast1"    # Singapore — BEST for PH
-  "asia-southeast2"    # Jakarta
-  "asia-east1"         # Taiwan
-  "asia-east2"         # Hong Kong
-  "asia-northeast1"    # Tokyo
-  "us-central1"        # Iowa — FREE TIER ✅
-  "us-east1"           # South Carolina
-  "us-west1"           # Oregon
-  "europe-west1"       # Belgium
+  "us-central1"       # Iowa, US 🇺🇸
+  "us-east1"          # South Carolina, US 🇺🇸
+  "us-east4"          # N. Virginia, US 🇺🇸
+  "us-west1"          # Oregon, US 🇺🇸
+  "asia-east1"        # Taiwan 🇹🇼
+  "asia-southeast1"   # Singapore 🇸🇬 — BEST for PH
+  "asia-northeast1"   # Tokyo, Japan 🇯🇵
+  "asia-northeast3"   # Seoul, South Korea 🇰🇷
+  "asia-south1"       # Mumbai, India 🇮🇳
+  "europe-west1"     # Belgium 🇧🇪
+  "europe-west4"     # Netherlands 🇳🇱
+  "europe-west9"     # Paris, France 🇫🇷
 )
 # ==============================================
 
@@ -46,28 +49,32 @@ fi
 echo "✅ Project: $PROJECT_ID"
 echo ""
 
-# 🌍 REGION SELECTOR — CLEAN VERSION ✅
-echo "🌍 Fetching available regions..."
-AVAILABLE_REGIONS=$(gcloud run regions list --format="value(name)" 2>/dev/null)
+# 🌍 REGION SELECTOR — FIXED AUTO-FETCH ✅
+echo "🌍 Checking available regions..."
+AVAILABLE_REGIONS_RAW=$(gcloud run regions list --format="value(name)" 2>/dev/null)
 
 REGION_LIST=()
-if [ -n "$AVAILABLE_REGIONS" ]; then
-  # ✅ EXTRACT PURE REGION CODE LANG — kuha ang katapusan human sa '/'
+if [ -n "$AVAILABLE_REGIONS_RAW" ]; then
+  # ✅ Extract clean region codes — remove project/locations/ prefix
   while IFS= read -r line; do
+    [ -z "$line" ] && continue
     REGION_CLEAN="${line##*/}"
     REGION_LIST+=("$REGION_CLEAN")
-  done <<< "$AVAILABLE_REGIONS"
-  
-  if [ ${#REGION_LIST[@]} -eq 0 ]; then
-    echo "⚠️  Using built-in region list"
+  done <<< "$AVAILABLE_REGIONS_RAW"
+
+  # ✅ Verify we got valid regions — if not, use fallback
+  if [ ${#REGION_LIST[@]} -lt 3 ]; then
+    echo "⚠️  Limited results — using curated region list"
     REGION_LIST=("${FALLBACK_REGIONS[@]}")
+  else
+    echo "✅ Available regions loaded: ${#REGION_LIST[@]} regions"
   fi
 else
-  echo "⚠️  Using built-in region list"
+  echo "⚠️  Could not fetch regions — using curated list"
   REGION_LIST=("${FALLBACK_REGIONS[@]}")
 fi
 
-# 🗺️ SELECTION LOOP — WITH BACK + EXIT ✅
+# 🗺️ SELECTION LOOP — WITH EXIT ✅
 while true; do
   echo ""
   echo "🗺️  Select Region:"
@@ -325,13 +332,13 @@ p{opacity:0.75;line-height:1.6;margin-bottom:2rem}
 </html>
 EOF
 
-# === Dockerfile — Supervisord Entrypoint ===
+# === Dockerfile — FIXED supervisord package name ✅ ===
 cat > Dockerfile <<'EOF'
 FROM alpine:3.20
 
 ENV XRAY_VERSION="v24.11.10"
 
-RUN apk update && apk add --no-cache haproxy wget unzip python3 py3-supervisord && \
+RUN apk update && apk add --no-cache haproxy wget unzip python3 supervisord && \
     rm -rf /var/cache/apk/*
 
 # Install Xray
@@ -349,7 +356,6 @@ EXPOSE 8080
 
 WORKDIR /var/www/decoy
 
-# ✅ Supervisord — Auto-Restart for all services
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
 EOF
 
@@ -411,14 +417,14 @@ echo "🔹 TROJAN"
 echo "   Address: $SERVICE_URL"
 echo "   Port:    443"
 echo "   Path:    /xray-trojan"
-echo "   Password: gcp-xray"
+echo "   Password: $TROJAN_PASS"
 echo ""
 echo "🔹 SHADOWSOCKS"
 echo "   Address: $SERVICE_URL"
 echo "   Port:    443"
 echo "   Path:    /xray-ss"
 echo "   Method:   aes-256-gcm"
-echo "   Password: gcp-xray"
+echo "   Password: $SS_PASS"
 echo "=========================================="
 echo "🔧 Powered by: Supervisord — Auto-Restart Enabled ✅"
 echo "🛡️  Anti-DDoS: Rate Limiting + Connection Protection ✅"
