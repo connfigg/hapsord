@@ -255,7 +255,7 @@ cat > xray.json <<JSON
 }
 JSON
 
-# === supervisord.conf — INSTANT START (No Startup Delay) ===
+# === supervisord.conf — STABLE STARTUP TIMING ===
 cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
@@ -265,17 +265,17 @@ user=root
 command=python3 -m http.server 9091
 directory=/var/www/decoy
 autorestart=true
-startsecs=1
+startsecs=2
 
 [program:xray]
 command=/opt/xray/xray run -config /etc/xray/config.json
 autorestart=true
-startsecs=1
+startsecs=3
 
 [program:haproxy]
 command=haproxy -f /etc/haproxy/haproxy.cfg
 autorestart=true
-startsecs=1
+startsecs=2
 EOF
 
 # === decoy/index.html ===
